@@ -1,0 +1,75 @@
+- hosts: all
+  become: yes
+  tasks:
+
+      - name: Install MariaDB repository 10.6
+        apt_repository: repo='deb [arch=amd64,arm64,ppc64el] http://nyc2.mirrors.digitalocean.com/mariadb/repo/10.6/ubuntu focal main' state=present
+    
+      - name: Add repository key to the system
+        apt_key: keyserver=hkp://keyserver.ubuntu.com:80 id=0xF1656F24C74CD1D8
+
+      - name: update
+        apt: update_cache=yes   
+        ignore_errors: yes      
+
+      - name: Install MariaDB Server 10.6
+        apt: name=mariadb-server state=latest
+        
+      - name: Install MariaDB Client 10.6
+        apt: name=mariadb-client state=latest
+
+      - name: Start MariaDB 10.6
+        service: name=mysql state=started enabled=yes
+      
+      - name: Create database
+        mysql_db:
+          state: present
+          name: hue
+          encoding: utf8
+          login_unix_socket: /var/run/mysqld/mysqld.sock
+
+      - name: Create Ranger database 
+        mysql_db:
+          state: present
+          name: ranger
+          encoding: utf8
+
+      - name: Create Oozie database
+        mysql_db:
+          state: present
+          name: oozie
+          encoding: utf8
+          collation: utf8_general_ci
+      
+      - name: Set Ranger user privileges
+        mysql_user:
+          name: ranger
+          priv: "ranger.*:ALL"
+          password: ranger
+          state: present
+
+      - name: Is root password set?
+        command: mysql -u root --execute "SELECT NOW()"
+        register: is_root_password_set
+        ignore_errors: yes
+
+      - name: Generate mysql root password
+        shell: tr -d -c "a-zA-Z0-9" \< /dev/urandom | head -c 10
+        register: mysql_root_password
+        when: is_root_password_set.rc == 0
+
+      - name: Set root password
+        mysql_user:
+          user=root
+          password="{{mysql_root_password.stdout}}"
+          host=localhost
+        when: is_root_password_set.rc == 0
+
+      - name: Remove test database
+        mysql_db: name=test state=absent
+
+      - name: Remove anonymous access
+        mysql_user: name="" host={{ item }} state=absent
+        with_items:
+          - localhost
+          - "{{ ansible_fqdn }}"
