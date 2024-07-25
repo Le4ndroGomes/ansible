@@ -1,0 +1,17 @@
+    - name: Configuring Cloudera Repo
+      hosts: all
+      become: yes
+      vars:
+        cloudera_distro: "redhat8"
+        cloudera_version: "7.11.3 CHF 6"
+        cloudera_repo_url: "https://archive.cloudera.com/p/cm7/7.11.3.9/redhat8/yum/"
+      tasks:
+        - name: Ad Cloudera Manager Repository
+          yum_repository:
+            name: cloudera-cm
+            description: Cloudera Manager
+            baseurl: "{{ cloudera_repo_url }}"
+            enabled: yes
+            gpgcheck: yes
+            gpgkey: "{{ cloudera_repo_url }}/RPM-GPG-KEY-cloudera"
+
